@@ -7,6 +7,7 @@ BEGIN TRANSACTION;
 DROP TRIGGER tr_domainlist_add;
 DROP TRIGGER tr_client_add;
 DROP TRIGGER tr_adlist_add;
+DROP TRIGGER tr_bulklist_add;
 
 INSERT OR REPLACE INTO "group" SELECT * FROM OLD."group";
 INSERT OR REPLACE INTO domain_audit SELECT * FROM OLD.domain_audit;
@@ -23,6 +24,10 @@ INSERT OR REPLACE INTO client SELECT * FROM OLD.client;
 DELETE FROM OLD.client_by_group WHERE client_id NOT IN (SELECT id FROM OLD.client);
 INSERT OR REPLACE INTO client_by_group SELECT * FROM OLD.client_by_group;
 
+INSERT OR REPLACE INTO bulklist SELECT * FROM OLD.bulklist;
+DELETE FROM OLD.bulklist_by_group WHERE bulklist_id NOT IN (SELECT id FROM OLD.bulklist);
+INSERT OR REPLACE INTO bulklist_by_group SELECT * FROM OLD.bulklist_by_group;
+
 
 CREATE TRIGGER tr_domainlist_add AFTER INSERT ON domainlist
     BEGIN
@@ -37,6 +42,11 @@ CREATE TRIGGER tr_client_add AFTER INSERT ON client
 CREATE TRIGGER tr_adlist_add AFTER INSERT ON adlist
     BEGIN
       INSERT INTO adlist_by_group (adlist_id, group_id) VALUES (NEW.id, 0);
+    END;
+
+CREATE TRIGGER tr_bulklist_add AFTER INSERT ON bulklist
+    BEGIN
+      INSERT INTO bulklist_by_group (bulklist_id, group_id) VALUES (NEW.id, 0);
     END;
 
 

@@ -98,6 +98,26 @@ CREATE TABLE client_by_group
 	PRIMARY KEY (client_id, group_id)
 );
 
+CREATE TABLE bulklist
+(
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	address TEXT NOT NULL,
+	enabled BOOLEAN NOT NULL DEFAULT 1,
+	date_added INTEGER NOT NULL DEFAULT (cast(strftime('%s', 'now') as int)),
+	date_modified INTEGER NOT NULL DEFAULT (cast(strftime('%s', 'now') as int)),
+	comment TEXT,
+	date_updated INTEGER,
+	type INTEGER NOT NULL DEFAULT 0,
+	UNIQUE(address, type)
+);
+
+CREATE TABLE bulklist_by_group
+(
+	bulklist_id INTEGER NOT NULL REFERENCES bulklist (id),
+	group_id INTEGER NOT NULL REFERENCES "group" (id),
+	PRIMARY KEY (bulklist_id, group_id)
+);
+
 CREATE TRIGGER tr_adlist_update AFTER UPDATE OF address,enabled,comment ON adlist
     BEGIN
       UPDATE adlist SET date_modified = (cast(strftime('%s', 'now') as int)) WHERE id = NEW.id;
@@ -111,6 +131,11 @@ CREATE TRIGGER tr_client_update AFTER UPDATE ON client
 CREATE TRIGGER tr_domainlist_update AFTER UPDATE ON domainlist
     BEGIN
       UPDATE domainlist SET date_modified = (cast(strftime('%s', 'now') as int)) WHERE domain = NEW.domain;
+    END;
+
+CREATE TRIGGER tr_bulklist_update AFTER UPDATE ON bulklist
+    BEGIN
+      UPDATE bulklist SET date_modified = (cast(strftime('%s', 'now') as int)) WHERE id = NEW.id;
     END;
 
 CREATE VIEW vw_whitelist AS SELECT domain, domainlist.id AS id, domainlist_by_group.group_id AS group_id
@@ -164,6 +189,11 @@ CREATE VIEW vw_adlist AS SELECT DISTINCT address, id, type
     WHERE enabled = 1
     ORDER BY id;
 
+CREATE VIEW vw_bulklist AS SELECT DISTINCT address, id, type
+    FROM bulklist
+    WHERE enabled = 1
+    ORDER BY id;
+
 CREATE TRIGGER tr_domainlist_add AFTER INSERT ON domainlist
     BEGIN
       INSERT INTO domainlist_by_group (domainlist_id, group_id) VALUES (NEW.id, 0);
@@ -177,6 +207,11 @@ CREATE TRIGGER tr_client_add AFTER INSERT ON client
 CREATE TRIGGER tr_adlist_add AFTER INSERT ON adlist
     BEGIN
       INSERT INTO adlist_by_group (adlist_id, group_id) VALUES (NEW.id, 0);
+    END;
+
+CREATE TRIGGER tr_bulklist_add AFTER INSERT ON bulklist
+    BEGIN
+      INSERT INTO bulklist_by_group (bulklist_id, group_id) VALUES (NEW.id, 0);
     END;
 
 CREATE TRIGGER tr_group_update AFTER UPDATE ON "group"
@@ -203,5 +238,11 @@ CREATE TRIGGER tr_client_delete AFTER DELETE ON client
     BEGIN
       DELETE FROM client_by_group WHERE client_id = OLD.id;
     END;
+
+CREATE TRIGGER tr_bulklist_delete AFTER DELETE ON bulklist
+    BEGIN
+      DELETE FROM bulklist_by_group WHERE bulklist_id = OLD.id;
+    END;
+
 
 COMMIT;
