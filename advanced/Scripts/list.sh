@@ -82,7 +82,7 @@ AddDomain() {
     json=$(jq --null-input --compact-output --arg domains "${domList[*]}" --arg comment "${comment}" '{domain: $domains | split(" "), comment: $comment}')
 
     # Send the request
-    data=$(PostFTLData "domains/${typeId}/${kindId}" "${json}")
+    data=$(SendAPIRequest POST "domains/${typeId}/${kindId}" "${json}")
 
     # Display domain(s) added
     # (they are listed in .processed.success, use jq)
@@ -130,7 +130,7 @@ RemoveDomain() {
     json=$(jq --null-input --compact-output --arg domains "${domList[*]}" --arg typeId "${typeId}" --arg kindId "${kindId}" '[ $domains | split(" ")[] as $item | {item: $item, type: $typeId, kind: $kindId} ]')
 
     # Send the request
-    data=$(PostFTLData "domains:batchDelete" "${json}" "status")
+    data=$(SendAPIRequest POST "domains:batchDelete" "${json}" "raw")
     # Separate the status from the data
     status=$(printf %s "${data#"${data%???}"}")
     data=$(printf %s "${data%???}")

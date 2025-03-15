@@ -208,45 +208,67 @@ LogoutAPI() {
     fi
 }
 
-GetFTLData() {
-  local data response status
-  # get the data from querying the API as well as the http status code
-  response=$(curl -skS -w "%{http_code}" -X GET "${API_URL}$1" -H "Accept: application/json" -H "sid: ${SID}" )
+SendAPIRequest() {
+    local data param response response_data response_status
 
-  if [ "${2}" = "raw" ]; then
-    # return the raw response
-    echo "${response}"
-  else
-
-    # status are the last 3 characters
-    # not using ${response#"${response%???}"}" here because it's extremely slow on big responses
-    status=$(printf "%s" "${response}" | tail -c 3)
-    # data is everything from response without the last 3 characters
-    data="${response%???}"
-
-    # return only the data
-    if [ "${status}" = 200 ]; then
-        # response OK
-        echo "${data}"
-    else
-        # connection lost
-        echo "${status}"
+    # Validate HTTP method
+    if ! echo "$1" | grep -qiE "^(get|post|put|delete)$"; then
+        echo "Invalid HTTP method: $1"
+        return # do not exit here as LogoutAPI should be called after this error
     fi
-  fi
+
+    data="$3"
+    param="$4"
+
+    if echo "$1" | grep -qiE "^(get)$"; then
+        data=""
+        [ -z "$4" ] && param="$3"
+    fi
+
+    # Send the data to the API
+    response=$(curl -skS -w "%{http_code}" -X "$1" "${API_URL}$2" --data-raw "${data}" -H "Accept: application/json" -H "sid: ${SID}" )
+
+    if [ "${param}" = "raw" ]; then
+        # return the raw response
+        echo "${response}"
+    else
+        # status are the last 3 characters
+        # not using ${response#"${response%???}"}" here because it's extremely slow on big responses
+        response_status=$(printf "%s" "${response}" | tail -c 3)
+        # data is everything from response without the last 3 characters
+        response_data="${response%???}"
+
+        # return only the data
+        if [ "${response_status}" = 200 ]; then
+            # response OK
+            echo "${response_data}"
+        else
+            # connection lost
+            echo "${response_status}"
+        fi
+    fi
+}
+
+GetFTLData() {
+    SendAPIRequest GET "$1" "" "$2"
 }
 
 PostFTLData() {
-  local data response status
-  # send the data to the API
-  response=$(curl -skS -w "%{http_code}" -X POST "${API_URL}$1" --data-raw "$2" -H "Accept: application/json" -H "sid: ${SID}" )
-  # data is everything from response without the last 3 characters
-  if [ "${3}" = "status" ]; then
-    # Keep the status code appended if requested
-    printf %s "${response}"
-  else
-    # Strip the status code
-    printf %s "${response%???}"
-  fi
+    local extra="$3"
+    [ "$3" = "status" ] && extra="raw" # backwards compatibility
+    SendAPIRequest POST "$1" "$2" "$extra"
+}
+
+PutFTLData() {
+    SendAPIRequest PUT "$1" "$2" "$3"
+}
+
+DeleteFTLData() {
+    SendAPIRequest DELETE "$1" "$2" "$3"
+}
+
+URLEncode() {
+    jq -rn --arg x "$1" '$x|@uri'
 }
 
 secretRead() {
@@ -301,32 +323,32 @@ secretRead() {
 }
 
 apiFunc() {
-  local data response status status_col
-
+  local method data response status status_col
   # Authenticate with the API
   LoginAPI verbose
   echo ""
-
-  echo "Requesting: ${COL_PURPLE}GET ${COL_CYAN}${API_URL}${COL_YELLOW}$1${COL_NC}"
+  # Check if user provided HTTP method
+  if echo "$1" | grep -qiE "^(get|post|put|delete)$"; then
+    method=$(echo "$1" | tr '[:lower:]' '[:upper:]')
+    shift
+  else
+    method=GET
+  fi
+  response="$(SendAPIRequest "$method" "$1" "$2" raw)"
+  echo "Requesting: ${COL_PURPLE}${method} ${COL_CYAN}${API_URL}${COL_YELLOW}$1${COL_NC}"
   echo ""
-
-  # Get the data from the API
-  response=$(GetFTLData "$1" raw)
-
   # status are the last 3 characters
   # not using ${response#"${response%???}"}" here because it's extremely slow on big responses
   status=$(printf "%s" "${response}" | tail -c 3)
   # data is everything from response without the last 3 characters
   data="${response%???}"
-
-  # Output the status (200 -> green, else red)
-  if [ "${status}" = 200 ]; then
+  # Output the status (20X -> green, else red)
+  if [ "${status}" = 200 ] || [ "${status}" = 201 ] || [ "${status}" = 204 ]; then
     status_col="${COL_GREEN}"
   else
     status_col="${COL_RED}"
   fi
   echo "Status: ${status_col}${status}${COL_NC}"
-
   # Output the data. Format it with jq if available and data is actually JSON.
   # Otherwise just print it
   echo "Data:"
@@ -335,7 +357,6 @@ apiFunc() {
   else
     echo "${data}"
   fi
-
   # Delete the session
   LogoutAPI verbose
 }

@@ -244,7 +244,7 @@ Time:
   LoginAPI
 
   # Send the request
-  data=$(PostFTLData "dns/blocking" "{ \"blocking\": ${1}, \"timer\": ${tt} }")
+  data=$(SendAPIRequest POST "dns/blocking" "{ \"blocking\": ${1}, \"timer\": ${tt} }")
 
   # Check the response
   local extra=" forever"
@@ -484,6 +484,7 @@ Debugging Options:
                       Add an optional argument to filter the log
                       (regular expressions are supported)
   api <endpoint>      Query the Pi-hole API at <endpoint>
+                        You can also use 'api <method> <endpoint> <data> to perform write operations'
 
 
 Options:
@@ -592,6 +593,6 @@ case "${1}" in
   "updatechecker"                 ) shift; updateCheckFunc "$@";;
   "arpflush"                      ) arpFunc "$@";;
   "-t" | "tail"                   ) tailFunc "$2";;
-  "api"                           ) apiFunc "$2";;
+  "api"                           ) shift; apiFunc "$@";;
   *                               ) helpFunc;;
 esac
